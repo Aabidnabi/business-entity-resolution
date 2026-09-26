@@ -7,3 +7,6 @@ output/*
 experiments/*
 *.log
 .DS_Store
+
+data/
+dataset/
