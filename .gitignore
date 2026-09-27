@@ -1,12 +1,17 @@
+.venv/
 __pycache__/
 *.pyc
-.ipynb_checkpoints/
-.venv/
-env/
-output/*
-experiments/*
-*.log
 .DS_Store
 
-data/
-dataset/
+# Generated processing files
+data/processed/
+
+# Generated competition outputs
+output/
+
+# Jupyter temporary files
+.ipynb_checkpoints/
+
+# Python/build/cache
+*.egg-info/
+.pytest_cache/
