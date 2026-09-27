@@ -7,7 +7,6 @@ import os
 MODEL = "output/lightgbm_model.txt"
 FEATURES_FILE = "output/test_features.parquet"
 CANDIDATES_FILE = "output/candidate_pairs_test.parquet"
-SCORED_FILE = "output/test_scored.parquet"
 
 THRESHOLD = float(open("output/best_threshold.txt").read().strip())
 
@@ -27,21 +26,15 @@ FEATURES = [
 
 os.makedirs("output", exist_ok=True)
 
-print("Loading model...")
+print(f"Loading model...")
 model = lgb.Booster(model_file=MODEL)
-
 print(f"Threshold: {THRESHOLD}")
 
 con = duckdb.connect()
 con.execute("PRAGMA threads=4")
 
-# Remove old scored file so we create a fresh one.
-if os.path.exists(SCORED_FILE):
-    os.remove(SCORED_FILE)
-
 print("Scoring test features in chunks...")
 
-# Create temporary scored table.
 con.execute("""
 CREATE OR REPLACE TABLE scored AS
 SELECT
@@ -56,7 +49,6 @@ offset = 0
 batch = 500000
 
 while True:
-
     df = con.execute("""
         SELECT
             source1_entity_id,
@@ -80,54 +72,23 @@ while True:
         break
 
     X = df[FEATURES]
-
     df["score"] = model.predict(X)
 
-    con.register(
-        "batch_df",
-        df[
-            [
-                "source1_entity_id",
-                "matched_entity_id",
-                "score",
-            ]
-        ],
-    )
+    con.register("batch_df", df[
+        ["source1_entity_id", "matched_entity_id", "score"]
+    ])
 
     con.execute("""
         INSERT INTO scored
-        SELECT *
-        FROM batch_df
+        SELECT * FROM batch_df
     """)
 
     offset += len(df)
+    print(f"Scored {offset:,} rows")
 
-    print(f"Scored {offset:,} rows", flush=True)
-
-
-# ---------------------------------------------------------
-# SAVE ALL MODEL SCORES
-# ---------------------------------------------------------
-
-print()
-print("Saving scored predictions...")
-
-con.execute("""
-COPY scored
-TO ?
-(FORMAT PARQUET)
-""", [SCORED_FILE])
-
-print(f"Saved: {SCORED_FILE}")
-
-
-# ---------------------------------------------------------
-# CREATE MATCHING RESULTS
-# ---------------------------------------------------------
-
-print()
 print("Creating matching_results.tsv...")
 
+# Keep only model-approved matches.
 matches = con.execute("""
 SELECT
     source1_entity_id,
@@ -139,11 +100,7 @@ ORDER BY source1_entity_id, matched_entity_id
 
 print(f"Predicted matches: {len(matches):,}")
 
-
-# ---------------------------------------------------------
-# BUILD ONE ROW FOR EVERY TEST S1
-# ---------------------------------------------------------
-
+# Build one row for EVERY test S1.
 s1 = con.execute("""
 SELECT entity_id
 FROM read_parquet('data/processed/test_source1.parquet')
@@ -151,8 +108,7 @@ ORDER BY entity_id
 """).df()
 
 grouped = (
-    matches
-    .groupby("source1_entity_id")["matched_entity_id"]
+    matches.groupby("source1_entity_id")["matched_entity_id"]
     .apply(lambda x: ",".join(map(str, x)))
     .to_dict()
 )
@@ -171,11 +127,7 @@ result.to_csv(
     index=False
 )
 
-
-# ---------------------------------------------------------
-# CREATE CANDIDATE PAIRS FILE
-# ---------------------------------------------------------
-
+# Candidate file required by the competition.
 cand = con.execute("""
 SELECT
     source1_entity_id,
@@ -190,21 +142,6 @@ cand.to_csv(
     index=False
 )
 
-
-# ---------------------------------------------------------
-# FINAL SUMMARY
-# ---------------------------------------------------------
-
-print()
-print("========================================")
-print("PREDICTION COMPLETE")
-print("========================================")
-print(f"Threshold:          {THRESHOLD}")
-print(f"Scored candidates:  {offset:,}")
-print(f"Predicted matches:  {len(matches):,}")
-print(f"Submission rows:    {len(result):,}")
-print(f"Candidate rows:     {len(cand):,}")
-print(f"Scores saved to:    {SCORED_FILE}")
-print("========================================")
+print(f"Submission rows: {len(result):,}")
+print(f"Candidate rows: {len(cand):,}")
 print("DONE")
-
