@@ -1,17 +1,23 @@
-.venv/
+# Python
 __pycache__/
-*.pyc
-.DS_Store
+*.py[cod]
+.venv/
+venv/
 
-# Generated processing files
+# Data
+dataset/
+data/raw/
 data/processed/
 
-# Generated competition outputs
+# Generated outputs
 output/
+_submission_stage/
+team_submission/
+team_two_files_only/
 
-# Jupyter temporary files
-.ipynb_checkpoints/
+# Large submission archives
+*.zip
 
-# Python/build/cache
-*.egg-info/
-.pytest_cache/
+# OS / IDE
+.DS_Store
+.vscode/
