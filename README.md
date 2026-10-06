@@ -796,3 +796,4 @@ The project also provided practical experience in designing and evaluating an en
 ## License
 
 Add the appropriate license for the repository if required by the team or competition organizers.
+# business-entity-resolution
